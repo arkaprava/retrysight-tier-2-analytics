@@ -1,0 +1,100 @@
+services:
+  postgres:
+    build:
+      context: ./docker/postgres
+    image: retrysight/tier-analytics-postgres:local
+    container_name: retrysight-analytics-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agent_retry_analytics}
+      POSTGRES_USER: ${POSTGRES_USER:-retrysight_analytics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme-analytics}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - tier_analytics_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  manager:
+    build:
+      context: .
+      dockerfile: infra/manager/Dockerfile
+    image: retrysight/tier-analytics-manager:local
+    container_name: retrysight-analytics-manager
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,tier-analytics}
+      MANAGER_PORT: ${MANAGER_PORT:-28473}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-agent_retry_analytics}
+      POSTGRES_USER: ${POSTGRES_USER:-retrysight_analytics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme-analytics}
+      JWT_SECRET: ${JWT_SECRET:-agent-retry-platform-dev-secret-key-32chars}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8082,http://localhost:28473}
+      SECADMIN_EMAIL: ${SECADMIN_EMAIL:-secadmin@local}
+      SECADMIN_PASSWORD: ${SECADMIN_PASSWORD:-changeme}
+      SSO_SECRET_KEY: ${SSO_SECRET_KEY:-dev-sso-secret-encryption-key-32}
+      SSO_CALLBACK_BASE_URL: ${SSO_CALLBACK_BASE_URL:-http://localhost:8082}
+      SSO_MANAGER_BASE_URL: ${SSO_MANAGER_BASE_URL:-http://localhost:28473}
+      AGENT_API_KEY: ${AGENT_API_KEY:-dev-agent-key}
+      SECURITY_ALLOW_DEFAULT_SECRETS: ${SECURITY_ALLOW_DEFAULT_SECRETS:-true}
+      CLICKHOUSE_ENABLED: "false"
+      OTEL_INGEST_ENABLED: ${OTEL_INGEST_ENABLED:-false}
+      RETENTION_TASK_EVENTS_DAYS: ${RETENTION_TASK_EVENTS_DAYS:-90}
+    ports:
+      - "${MANAGER_PORT:-28473}:${MANAGER_PORT:-28473}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${MANAGER_PORT:-28473}/api/v1/auth/sso/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/frontend/Dockerfile
+    image: retrysight/tier-analytics-frontend:local
+    container_name: retrysight-analytics-frontend
+    environment:
+      MANAGER_PORT: ${MANAGER_PORT:-28473}
+    ports:
+      - "${FRONTEND_PORT:-8082}:80"
+    depends_on:
+      manager:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: .
+      dockerfile: infra/agent/Dockerfile
+    image: retrysight/tier-analytics-agent:local
+    container_name: retrysight-analytics-agent
+    profiles:
+      - agent
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,tier-analytics}
+      MANAGER_PORT: ${MANAGER_PORT:-28473}
+      AGENT_MANAGER_URL: ${AGENT_MANAGER_URL:-http://manager:28473}
+      AGENT_MANAGER_API_KEY: ${AGENT_API_KEY:-dev-agent-key}
+    volumes:
+      - ${HOME}/.cursor:/home/collector/.cursor:ro
+      - ${HOME}/.claude:/home/collector/.claude:ro
+      - ${HOME}/.codex:/home/collector/.codex:ro
+      - ${HOME}/.kiro:/home/collector/.kiro:ro
+      - ${HOME}/.copilot:/home/collector/.copilot:ro
+      - tier_analytics_buffer:/home/collector/.agent-retry
+      - ./config/agent/config.yaml:/home/collector/.agent-retry/config.yaml:ro
+    depends_on:
+      manager:
+        condition: service_healthy
+
+volumes:
+  tier_analytics_pgdata:
+  tier_analytics_buffer:

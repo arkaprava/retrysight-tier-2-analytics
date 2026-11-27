@@ -1,0 +1,48 @@
+agent:
+  platform:
+    installation-tier: TIER_2_ANALYTICS
+
+  manager:
+    url: http://localhost:28473
+    api-key: dev-agent-key
+
+  collectors:
+    - type: cursor
+      enabled: true
+      watch-path: ~/.cursor/projects
+    - type: claude_code
+      enabled: true
+      watch-path: ~/.claude/projects
+    - type: codex
+      enabled: true
+      watch-path: ~/.codex/sessions
+    - type: kiro
+      enabled: true
+      watch-path: ~/.kiro/sessions/cli
+    - type: copilot
+      enabled: true
+      watch-path: ~/.copilot/session-state
+    - type: warp
+      enabled: true
+      watch-path: ~/Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable/warp.sqlite
+    - type: windsurf
+      enabled: false
+      watch-path: ~/.codeium/windsurf/cascade
+    - type: continue
+      enabled: false
+      watch-path: ~/.continue/sessions
+    - type: cline
+      enabled: false
+      watch-path: ~/.cline/logs
+    - type: aider
+      enabled: false
+      watch-path: ~/.aider
+    - type: opencode
+      enabled: false
+      watch-path: ~/.opencode/sessions
+    - type: kiro_ide
+      enabled: false
+      watch-path: ~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent
+
+  privacy:
+    store-full-prompts: false
